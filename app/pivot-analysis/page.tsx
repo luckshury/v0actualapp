@@ -883,10 +883,6 @@ export default function PivotAnalysisPage() {
         if (ticker === 'BTCUSDT' || !ticker.includes('/')) {
           setTicker('BTC/USD')
         }
-        if (true) { // always use defaults for now
-          return
-          }
-        }
       } catch (err) {
         console.error('Failed to fetch tickers:', err)
       }
