@@ -778,9 +778,10 @@ export default function PivotAnalysisPage() {
   const { pivotAnalysisSettings, updatePivotAnalysisSettings } = useAppState()
   
   // Destructure settings for easier access
-  const { ticker, selectedWeekdays, heatmapScheme, intensity: savedIntensity, daysBack } = pivotAnalysisSettings
+  const { exchange, ticker, selectedWeekdays, heatmapScheme, intensity: savedIntensity, daysBack } = pivotAnalysisSettings
   
   // Helper functions to update settings
+  const setExchange = (value: string) => updatePivotAnalysisSettings({ exchange: value })
   const setTicker = (value: string) => updatePivotAnalysisSettings({ ticker: value })
   const setSelectedWeekdays = (value: number[]) => updatePivotAnalysisSettings({ selectedWeekdays: value })
   const setHeatmapScheme = (value: HeatmapScheme) => updatePivotAnalysisSettings({ heatmapScheme: value })
@@ -864,31 +865,29 @@ export default function PivotAnalysisPage() {
     return () => observer.disconnect()
   }, [])
 
-  // Fetch available tickers from MMT markets endpoint
+  // Fetch available tickers from MMT markets endpoint based on selected exchange
+  const [loadingSymbols, setLoadingSymbols] = useState(false)
   useEffect(() => {
     const fetchTickers = async () => {
+      setLoadingSymbols(true)
       try {
-        const response = await fetch('/api/mmt-candles?exchange=binancef&symbol=btc/usd&tf=1h&from=0&to=0')
-        // Fallback: use a static list of common symbols
-        const defaultTickers = [
-          'BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XRP/USD',
-          'ADA/USD', 'DOGE/USD', 'AVAX/USD', 'LINK/USD', 'DOT/USD',
-          'MATIC/USD', 'UNI/USD', 'ATOM/USD', 'LTC/USD', 'FIL/USD',
-          'APT/USD', 'ARB/USD', 'OP/USD', 'SUI/USD', 'SEI/USD',
-          'NEAR/USD', 'FTM/USD', 'AAVE/USD', 'MKR/USD', 'INJ/USD',
-          'TIA/USD', 'JUP/USD', 'WIF/USD', 'PEPE/USD', 'BONK/USD',
-        ]
-        setTickers(defaultTickers)
-        // Set default ticker if current one is in Bybit format
-        if (ticker === 'BTCUSDT' || !ticker.includes('/')) {
-          setTicker('BTC/USD')
+        const response = await fetch(`/api/mmt-markets?exchange=${encodeURIComponent(exchange)}`)
+        const data = await response.json()
+        const symbols: string[] = data.symbols || []
+        setTickers(symbols)
+        // If current ticker isn't available on new exchange, default to BTC/USD or first
+        if (symbols.length > 0 && !symbols.includes(ticker)) {
+          const btc = symbols.find(s => s === 'BTC/USD')
+          setTicker(btc || symbols[0])
         }
       } catch (err) {
         console.error('Failed to fetch tickers:', err)
+        setTickers(['BTC/USD', 'ETH/USD', 'SOL/USD'])
       }
+      setLoadingSymbols(false)
     }
     fetchTickers()
-  }, [])
+  }, [exchange])
 
   // Filter tickers based on search
   const filteredTickers = useMemo(() => {
@@ -967,7 +966,7 @@ export default function PivotAnalysisPage() {
       const fromSec = Math.floor(startMs / 1000)
       const toSec = Math.floor(endMs / 1000)
 
-      const mmtUrl = `/api/mmt-candles?exchange=binancef&symbol=${encodeURIComponent(mmtSymbol)}&tf=1h&from=${fromSec}&to=${toSec}`
+      const mmtUrl = `/api/mmt-candles?exchange=${encodeURIComponent(exchange)}&symbol=${encodeURIComponent(mmtSymbol)}&tf=1h&from=${fromSec}&to=${toSec}`
       const response = await fetchWithTimeout(mmtUrl, 30000)
 
       if (!response.ok) {
@@ -1015,7 +1014,7 @@ export default function PivotAnalysisPage() {
           const todayStartSec = Math.floor(new Date(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()).getTime() / 1000)
           const todayEndSec = todayStartSec + 86400
 
-          const url15m = `/api/mmt-candles?exchange=binancef&symbol=${encodeURIComponent(mmtSymbol)}&tf=15m&from=${todayStartSec}&to=${todayEndSec}`
+          const url15m = `/api/mmt-candles?exchange=${encodeURIComponent(exchange)}&symbol=${encodeURIComponent(mmtSymbol)}&tf=15m&from=${todayStartSec}&to=${todayEndSec}`
           const response15m = await fetchWithTimeout(url15m, 15000)
 
           if (response15m.ok) {
@@ -1128,14 +1127,14 @@ export default function PivotAnalysisPage() {
     } finally {
       setLoading(false)
     }
-  }, [ticker, dateRange, selectedWeekdays, adjustForToday])
+  }, [exchange, ticker, dateRange, selectedWeekdays, adjustForToday])
 
   // Auto-fetch on mount and when parameters change
   useEffect(() => {
     if (ticker && dateRange?.from && dateRange?.to) {
       fetchPivotData()
     }
-  }, [ticker, dateRange?.from, dateRange?.to, selectedWeekdays, adjustForToday, fetchPivotData])
+  }, [exchange, ticker, dateRange?.from, dateRange?.to, selectedWeekdays, adjustForToday, fetchPivotData])
 
   const toggleWeekday = (value: number) => {
     setSelectedWeekdays(
@@ -1251,6 +1250,34 @@ export default function PivotAnalysisPage() {
   const renderControlSection = () => (
     <div className="border-b border-border bg-card px-4 py-3">
       <div className="flex items-center gap-3 flex-wrap">
+        {/* Exchange Dropdown */}
+        <Select value={exchange} onValueChange={setExchange}>
+          <SelectTrigger className="w-44 font-mono text-xs h-8">
+            <SelectValue placeholder="Exchange" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="binancef" className="font-mono text-xs">Binance Futures</SelectItem>
+            <SelectItem value="bybitf" className="font-mono text-xs">Bybit Futures</SelectItem>
+            <SelectItem value="okxf" className="font-mono text-xs">OKX Futures</SelectItem>
+            <SelectItem value="deribitf" className="font-mono text-xs">Deribit Futures</SelectItem>
+            <SelectItem value="hyperliquid" className="font-mono text-xs">Hyperliquid</SelectItem>
+            <SelectItem value="hyperliquid-xyz" className="font-mono text-xs">Hyperliquid XYZ</SelectItem>
+            <SelectItem value="bitmexf" className="font-mono text-xs">BitMEX Futures</SelectItem>
+            <SelectItem value="bitfinexf" className="font-mono text-xs">Bitfinex Futures</SelectItem>
+            <SelectItem value="lighterf" className="font-mono text-xs">Lighter</SelectItem>
+            <SelectItem value="bybitf-inverse" className="font-mono text-xs">Bybit Inverse</SelectItem>
+            <SelectItem value="bitmexf-inverse" className="font-mono text-xs">BitMEX Inverse</SelectItem>
+            <SelectItem value="deribitf-inverse" className="font-mono text-xs">Deribit Inverse</SelectItem>
+            <SelectItem value="binance" className="font-mono text-xs">Binance Spot</SelectItem>
+            <SelectItem value="bybit" className="font-mono text-xs">Bybit Spot</SelectItem>
+            <SelectItem value="coinbase" className="font-mono text-xs">Coinbase</SelectItem>
+            <SelectItem value="okx" className="font-mono text-xs">OKX Spot</SelectItem>
+            <SelectItem value="deribit" className="font-mono text-xs">Deribit Spot</SelectItem>
+            <SelectItem value="kraken" className="font-mono text-xs">Kraken</SelectItem>
+            <SelectItem value="bitfinex" className="font-mono text-xs">Bitfinex</SelectItem>
+          </SelectContent>
+        </Select>
+
         {/* Ticker Search Dropdown */}
         <div className="w-40">
           <Popover open={tickerOpen} onOpenChange={setTickerOpen}>

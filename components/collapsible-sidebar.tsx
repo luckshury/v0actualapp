@@ -3,7 +3,7 @@
 import { useState, useEffect, memo } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, GitBranch, Moon, Sun, ScrollText, Type, Activity, TrendingUp, Globe } from 'lucide-react'
+import { ChevronLeft, GitBranch, Moon, Sun, ScrollText, Type, Activity, ChartCandlestick, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppState } from '@/contexts/app-state-context'
 import {
@@ -26,7 +26,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: Activity, label: 'Screener', command: 'screener', href: '/screener' },
   { icon: Globe, label: 'Landscape', command: 'landscape', href: '/landscape' },
-  { icon: TrendingUp, label: 'Positioning', command: 'positioning', href: '/positioning' },
+  { icon: ChartCandlestick, label: 'Session Candles', command: 'sessions', href: '/session-candles' },
   { icon: GitBranch, label: 'Pivot Analysis', command: 'pivot', href: '/pivot-analysis' },
 ]
 

@@ -69,6 +69,7 @@ interface L4OrdersSettings {
 }
 
 interface PivotAnalysisSettings {
+  exchange: string
   ticker: string
   selectedWeekdays: number[]
   heatmapScheme: 'viridis' | 'plasma' | 'inferno' | 'turbo' | 'blues' | 'green'
@@ -142,6 +143,7 @@ const DEFAULT_L4_ORDERS_SETTINGS: L4OrdersSettings = {
 }
 
 const DEFAULT_PIVOT_ANALYSIS_SETTINGS: PivotAnalysisSettings = {
+  exchange: 'binancef',
   ticker: 'BTC/USD',
   selectedWeekdays: [],
   heatmapScheme: 'viridis',
