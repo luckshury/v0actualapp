@@ -1249,10 +1249,10 @@ export default function PivotAnalysisPage() {
 
   const renderControlSection = () => (
     <div className="border-b border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3 md:flex-wrap">
         {/* Exchange Dropdown */}
         <Select value={exchange} onValueChange={setExchange}>
-          <SelectTrigger className="w-44 font-mono text-xs h-8">
+          <SelectTrigger className="w-full md:w-44 font-mono text-xs h-8">
             <SelectValue placeholder="Exchange" />
           </SelectTrigger>
           <SelectContent>
@@ -1279,7 +1279,7 @@ export default function PivotAnalysisPage() {
         </Select>
 
         {/* Ticker Search Dropdown */}
-        <div className="w-40">
+        <div className="w-full md:w-40">
           <Popover open={tickerOpen} onOpenChange={setTickerOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -1388,7 +1388,7 @@ export default function PivotAnalysisPage() {
 
         {/* Color Scheme Selector */}
         <Select value={heatmapScheme} onValueChange={(v) => setHeatmapScheme(v as HeatmapScheme)}>
-          <SelectTrigger className="w-24 h-8 font-mono text-xs">
+          <SelectTrigger className="w-full md:w-24 h-8 font-mono text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1401,7 +1401,7 @@ export default function PivotAnalysisPage() {
         </Select>
 
         {/* Intensity Slider */}
-        <div className="flex items-center gap-3 w-52">
+        <div className="flex items-center gap-3 w-full md:w-52">
           <span className="text-xs text-muted-foreground font-mono whitespace-nowrap">Int:</span>
           <Slider
             value={intensity}
@@ -1471,7 +1471,7 @@ export default function PivotAnalysisPage() {
               {renderControlSection()}
 
       {/* Main Content: Table + Key Insights */}
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 overflow-auto md:overflow-hidden p-4">
         {loading ? (
           <div className="flex items-center justify-center h-full flex-col gap-4">
             {/* Futuristic Loading Animation */}
@@ -1488,12 +1488,12 @@ export default function PivotAnalysisPage() {
             </div>
           </div>
         ) : hourlyStats.length > 0 ? (
-          <div className="flex gap-4 h-full">
+          <div className="flex flex-col md:flex-row gap-4 h-full">
             {/* Left: Pivot Table (60%) */}
-            <div className="w-[60%] flex flex-col">
+            <div className="w-full md:w-[60%] flex flex-col min-h-0">
               <div className="bg-card border border-border rounded overflow-hidden flex-1 flex flex-col">
                 <div className="overflow-auto flex-1">
-                  <table className="w-full font-mono text-sm">
+                  <table className="w-full min-w-[480px] font-mono text-sm">
                     <thead className="sticky top-0 bg-muted/50 z-10">
                       <tr className="border-b border-border">
                         <th className="px-4 py-2.5 text-left font-semibold">Hour</th>
@@ -1538,7 +1538,7 @@ export default function PivotAnalysisPage() {
             </div>
 
             {/* Right: Key Insights (40%) */}
-            <div className="w-[40%] flex flex-col">
+            <div className="w-full md:w-[40%] flex flex-col">
               <div className="bg-card border border-border rounded p-4 flex-1 overflow-auto">
                 <h3 className="text-sm font-bold font-mono mb-4 text-foreground sticky top-0 bg-card pb-2 border-b border-border">Key Insights</h3>
                 <div className="space-y-4 text-xs font-mono">
@@ -1816,7 +1816,7 @@ export default function PivotAnalysisPage() {
             <TabsContent value="daily" className="flex-1 flex flex-col m-0">
               {renderControlSection()}
               <div className="flex-1 overflow-hidden p-4">
-                <div className="flex gap-4 h-full">
+                <div className="flex flex-col md:flex-row gap-4 h-full">
                   <div className="flex flex-col gap-3 flex-1 min-w-0">
                     <div className="text-xs text-muted-foreground font-mono px-2 flex-none">
                       {filteredDailyPivots.length > 0
@@ -1851,7 +1851,7 @@ export default function PivotAnalysisPage() {
                   </div>
                   
                   {/* Key Insights Widget */}
-                  <div className="w-[340px] flex-none h-full overflow-hidden">
+                  <div className="w-full md:w-[340px] flex-none md:h-full overflow-hidden">
                     <DistanceKeyInsightsWidget
                       ticker={ticker}
                       dataPoints={filteredDailyPivots.length}
@@ -1887,7 +1887,7 @@ export default function PivotAnalysisPage() {
                   onClick={() => setSelectedBin(null)}
                 >
                   <div 
-                    className="bg-card border border-border rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+                    className="bg-card border border-border rounded-lg shadow-xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[80vh] overflow-hidden flex flex-col"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="border-b border-border px-4 py-3 flex items-center justify-between bg-muted/30">

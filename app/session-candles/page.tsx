@@ -245,10 +245,10 @@ export default function SessionCandlesPage() {
     <div className="flex flex-col h-full">
       {/* Controls */}
       <div className="border-b border-border bg-card px-4 py-3">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3 md:flex-wrap">
           {/* Exchange */}
           <Select value={exchange} onValueChange={setExchange}>
-            <SelectTrigger className="w-44 font-mono text-xs h-8">
+            <SelectTrigger className="w-full md:w-44 font-mono text-xs h-8">
               <SelectValue placeholder="Exchange" />
             </SelectTrigger>
             <SelectContent>
@@ -275,7 +275,7 @@ export default function SessionCandlesPage() {
           </Select>
 
           {/* Ticker */}
-          <div className="w-40">
+          <div className="w-full md:w-40">
             <Popover open={tickerOpen} onOpenChange={setTickerOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -328,7 +328,7 @@ export default function SessionCandlesPage() {
 
           {/* Days */}
           <Select value={days} onValueChange={setDays}>
-            <SelectTrigger className="w-24 font-mono text-xs h-8">
+            <SelectTrigger className="w-full md:w-24 font-mono text-xs h-8">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -361,7 +361,7 @@ export default function SessionCandlesPage() {
       </div>
 
       {/* Session Legend */}
-      <div className="border-b border-border bg-card px-4 py-1.5 flex items-center gap-4">
+      <div className="border-b border-border bg-card px-4 py-1.5 flex items-center gap-4 overflow-x-auto">
         <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Sessions (UTC):</span>
         <span className="text-[10px] font-mono"><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{ background: '#4A90D9' }} />Asia 00–06</span>
         <span className="text-[10px] font-mono"><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{ background: '#E6A817' }} />London 06–12</span>
