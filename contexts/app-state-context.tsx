@@ -142,7 +142,7 @@ const DEFAULT_L4_ORDERS_SETTINGS: L4OrdersSettings = {
 }
 
 const DEFAULT_PIVOT_ANALYSIS_SETTINGS: PivotAnalysisSettings = {
-  ticker: 'BTCUSDT',
+  ticker: 'BTC/USD',
   selectedWeekdays: [],
   heatmapScheme: 'viridis',
   intensity: 1.0,

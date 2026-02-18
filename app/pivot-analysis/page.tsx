@@ -51,6 +51,7 @@ import { cn } from '@/lib/utils'
 import { useAppState } from '@/contexts/app-state-context'
 import {
   parseHourlyCandles,
+  parseMMTCandles,
   calculateDailyPivots,
   calculateHourlyStats,
   adjustForCurrentDay,
@@ -863,15 +864,27 @@ export default function PivotAnalysisPage() {
     return () => observer.disconnect()
   }, [])
 
-  // Fetch available tickers from Bybit
+  // Fetch available tickers from MMT markets endpoint
   useEffect(() => {
     const fetchTickers = async () => {
       try {
-        const response = await fetch('/api/bybit-tickers')
-        if (response.ok) {
-          const data = await response.json()
-          if (data.tickers && Array.isArray(data.tickers)) {
-            setTickers(data.tickers)
+        const response = await fetch('/api/mmt-candles?exchange=binancef&symbol=btc/usd&tf=1h&from=0&to=0')
+        // Fallback: use a static list of common symbols
+        const defaultTickers = [
+          'BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XRP/USD',
+          'ADA/USD', 'DOGE/USD', 'AVAX/USD', 'LINK/USD', 'DOT/USD',
+          'MATIC/USD', 'UNI/USD', 'ATOM/USD', 'LTC/USD', 'FIL/USD',
+          'APT/USD', 'ARB/USD', 'OP/USD', 'SUI/USD', 'SEI/USD',
+          'NEAR/USD', 'FTM/USD', 'AAVE/USD', 'MKR/USD', 'INJ/USD',
+          'TIA/USD', 'JUP/USD', 'WIF/USD', 'PEPE/USD', 'BONK/USD',
+        ]
+        setTickers(defaultTickers)
+        // Set default ticker if current one is in Bybit format
+        if (ticker === 'BTCUSDT' || !ticker.includes('/')) {
+          setTicker('BTC/USD')
+        }
+        if (true) { // always use defaults for now
+          return
           }
         }
       } catch (err) {
@@ -941,8 +954,6 @@ export default function PivotAnalysisPage() {
       // Log for debugging
       console.log(`Fetching ${daysDiff} days (${hoursNeeded} hours) in ${chunks} chunks for ${ticker}`)
       
-      let allCandles: any[] = []
-      
       const fetchWithTimeout = async (url: string, timeoutMs: number) => {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -952,62 +963,34 @@ export default function PivotAnalysisPage() {
           clearTimeout(timeoutId)
         }
       }
-      
-      for (let i = 0; i < chunks; i++) {
-        const chunkStart = startMs + (i * maxCandlesPerRequest * 60 * 60 * 1000)
-        const chunkEnd = Math.min(
-          chunkStart + (maxCandlesPerRequest * 60 * 60 * 1000),
-          endMs
-        )
-        
-        const params = new URLSearchParams({
-          symbol: ticker,
-          interval: '60',
-          start: chunkStart.toString(),
-          end: chunkEnd.toString(),
-          limit: '1000',
-        })
-        
-        // Add delay between requests to avoid rate limiting (except for first request)
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 200)) // 200ms delay
-        }
-        
-        const response = await fetchWithTimeout(
-          `/api/bybit-intraday?${params.toString()}`,
-          15000
-        )
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMsg = errorData.retMsg || `API returned status ${response.status}`
-          
-          // Provide more helpful error messages
-          if (response.status === 403) {
-            throw new Error(`Access forbidden (403): ${errorMsg}. Try reducing the date range or waiting a moment before retrying. Bybit may be rate limiting or blocking requests.`)
-          } else if (response.status === 429) {
-            throw new Error(`Rate limit exceeded (429): ${errorMsg}. Please wait a moment before retrying.`)
-          } else {
-            throw new Error(`Failed to fetch data: ${errorMsg}`)
-          }
-        }
-        
-        const result = await response.json()
-        
-        if (result.retCode !== 0) {
-          throw new Error(result.retMsg || 'Failed to fetch kline data')
-        }
-        
-        if (result.result?.list) {
-          allCandles = [...allCandles, ...result.result.list.reverse()]
-        }
+
+      // Convert ticker to MMT symbol format (e.g. "BTC/USD" -> "btc/usd")
+      const mmtSymbol = ticker.toLowerCase().includes('/') ? ticker.toLowerCase() : ticker.replace(/usdt?$/i, '/usd').toLowerCase()
+
+      // Fetch from MMT API (unix seconds)
+      const fromSec = Math.floor(startMs / 1000)
+      const toSec = Math.floor(endMs / 1000)
+
+      const mmtUrl = `/api/mmt-candles?exchange=binancef&symbol=${encodeURIComponent(mmtSymbol)}&tf=1h&from=${fromSec}&to=${toSec}`
+      const response = await fetchWithTimeout(mmtUrl, 30000)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMsg = errorData?.error?.message || `API returned status ${response.status}`
+        throw new Error(`Failed to fetch data: ${errorMsg}`)
       }
-      
-      if (allCandles.length === 0) {
+
+      const result = await response.json()
+
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to fetch candle data')
+      }
+
+      if (!result.data || result.data.length === 0) {
         throw new Error('No data available for the selected date range')
       }
-      
-      const hourlyCandles = parseHourlyCandles(allCandles)
+
+      const hourlyCandles = parseMMTCandles(result.data)
       const pivots = calculateDailyPivots(hourlyCandles)
       
       // Store daily pivots for popover display
@@ -1033,109 +1016,60 @@ export default function PivotAnalysisPage() {
       // Fetch 15-minute data for today to get precise times
       if (todayPivot) {
         try {
-          const todayStart = new Date(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()).getTime()
-          const todayEnd = todayStart + (24 * 60 * 60 * 1000)
-          
-          const params15m = new URLSearchParams({
-            symbol: ticker,
-            interval: '15',
-            start: todayStart.toString(),
-            end: todayEnd.toString(),
-            limit: '100',
-          })
-          
-          const response15m = await fetchWithTimeout(
-            `/api/bybit-intraday?${params15m.toString()}`,
-            15000
-          )
+          const todayStartSec = Math.floor(new Date(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()).getTime() / 1000)
+          const todayEndSec = todayStartSec + 86400
+
+          const url15m = `/api/mmt-candles?exchange=binancef&symbol=${encodeURIComponent(mmtSymbol)}&tf=15m&from=${todayStartSec}&to=${todayEndSec}`
+          const response15m = await fetchWithTimeout(url15m, 15000)
+
           if (response15m.ok) {
             const result15m = await response15m.json()
-            if (result15m.retCode === 0 && result15m.result?.list) {
-              const candles15m = result15m.result.list.reverse()
-              
-              // Find the actual daily high and low from all candles
+            if (result15m.data && result15m.data.length > 0) {
+              const candles15m = result15m.data
+
+              // Find the actual daily high and low
               let actualDailyHigh = -Infinity
               let actualDailyLow = Infinity
-              
-              for (const candle of candles15m) {
-                const h = parseFloat(candle[2])
-                const l = parseFloat(candle[3])
-                if (h > actualDailyHigh) actualDailyHigh = h
-                if (l < actualDailyLow) actualDailyLow = l
+
+              for (const c of candles15m) {
+                if (c.h > actualDailyHigh) actualDailyHigh = c.h
+                if (c.l < actualDailyLow) actualDailyLow = c.l
               }
-              
-              // Now find when each was first reached
-              let highTime = null
-              let lowTime = null
+
+              // Find when each was first reached
+              let highTime: number | null = null
+              let lowTime: number | null = null
               let highTimestamp = Infinity
               let lowTimestamp = Infinity
-              
-              for (const candle of candles15m) {
-                const [timestamp, open, high, low, close] = candle
-                const ts = parseInt(timestamp)
-                const h = parseFloat(high)
-                const l = parseFloat(low)
-                
-                // Check if this candle contains the daily high (within tolerance)
-                if (!highTime && Math.abs(h - actualDailyHigh) < 0.01) {
-                  highTime = ts
-                  highTimestamp = ts
-                }
-                
-                // Check if this candle contains the daily low (within tolerance)
-                if (!lowTime && Math.abs(l - actualDailyLow) < 0.01) {
-                  lowTime = ts
-                  lowTimestamp = ts
-                }
-                
+
+              for (const c of candles15m) {
+                const ts = c.t * 1000
+                if (!highTime && c.h >= actualDailyHigh) { highTime = ts; highTimestamp = ts }
+                if (!lowTime && c.l <= actualDailyLow) { lowTime = ts; lowTimestamp = ts }
                 if (highTime && lowTime) break
               }
-              
-              // Format times and prepare chart data
-              let p1Time = null
-              let p2Time = null
-              let p1Price = null
-              let p2Price = null
-              
+
+              let p1Time = null, p2Time = null, p1Price = null, p2Price = null
+
               if (highTimestamp < lowTimestamp) {
-                // High came first = P1
-                if (highTime) {
-                  const date = new Date(highTime)
-                  p1Time = `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`
-                  p1Price = actualDailyHigh
-                }
-                if (lowTime) {
-                  const date = new Date(lowTime)
-                  p2Time = `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`
-                  p2Price = actualDailyLow
-                }
+                if (highTime) { const d = new Date(highTime); p1Time = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; p1Price = actualDailyHigh }
+                if (lowTime) { const d = new Date(lowTime); p2Time = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; p2Price = actualDailyLow }
               } else {
-                // Low came first = P1
-                if (lowTime) {
-                  const date = new Date(lowTime)
-                  p1Time = `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`
-                  p1Price = actualDailyLow
-                }
-                if (highTime) {
-                  const date = new Date(highTime)
-                  p2Time = `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`
-                  p2Price = actualDailyHigh
-                }
+                if (lowTime) { const d = new Date(lowTime); p1Time = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; p1Price = actualDailyLow }
+                if (highTime) { const d = new Date(highTime); p2Time = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; p2Price = actualDailyHigh }
               }
-              
-              // Prepare chart data
-              const chartData = candles15m.map((candle: any) => {
-                const [timestamp, open, high, low, close] = candle
-                const date = new Date(parseInt(timestamp))
+
+              const chartData = candles15m.map((c: any) => {
+                const d = new Date(c.t * 1000)
                 return {
-                  time: `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`,
-                  timestamp: parseInt(timestamp),
-                  price: parseFloat(close),
-                  high: parseFloat(high),
-                  low: parseFloat(low),
+                  time: `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`,
+                  timestamp: c.t * 1000,
+                  price: c.c,
+                  high: c.h,
+                  low: c.l,
                 }
               })
-              
+
               setTodayP1Time(p1Time)
               setTodayP2Time(p2Time)
               setTodayP1Price(p1Price)

@@ -85,6 +85,26 @@ export function parseHourlyCandles(bybitData: any[]): HourlyCandle[] {
 }
 
 /**
+ * Converts MMT candle data to our format
+ * MMT format: { t: unix_seconds, o, h, l, c, vb, vs, tb, ts }
+ */
+export function parseMMTCandles(mmtData: any[]): HourlyCandle[] {
+  return mmtData.map(candle => {
+    const timestampMs = candle.t * 1000 // MMT uses seconds, we use ms
+    const date = new Date(timestampMs)
+    
+    return {
+      timestamp: timestampMs,
+      open: candle.o,
+      high: candle.h,
+      low: candle.l,
+      close: candle.c,
+      hour: date.getUTCHours(),
+    }
+  })
+}
+
+/**
  * Groups hourly candles into daily pivots
  */
 export function calculateDailyPivots(hourlyCandles: HourlyCandle[]): DailyPivot[] {
